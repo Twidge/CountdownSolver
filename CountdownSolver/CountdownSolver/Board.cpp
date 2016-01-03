@@ -42,22 +42,17 @@ bool Board::RecursiveSolve() const
 {
 	IntermediateStep t_workingOut = { m_chosenNumbers, std::vector<int> {0} };
 
-	std::cout << *this;
-
 	InfoAboutNumbersReached t_endResult = RecursiveSolve(t_workingOut);
 
 	// Check if any of them are equal to the target
-
-	std::cout << *this;
 
 	for (unsigned int numbersReachedIndex = 0; numbersReachedIndex < t_endResult.numbersReached.size(); numbersReachedIndex++)
 	{
 		if (t_endResult.numbersReached[numbersReachedIndex] == m_target)
 		{
 			t_endResult.targetReached = true;
+			break;
 		}
-
-		break;
 	}
 
 	if (t_endResult.targetReached)

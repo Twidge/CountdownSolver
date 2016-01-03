@@ -10,7 +10,7 @@ int _tmain(int argc, _TCHAR* argv[])
 {
 	srand(static_cast<unsigned int>(time(NULL)));
 
-	Board gameBoard = Board();
+	Board gameBoard;
 
 	gameBoard.SetUpNumbersAndTarget(2, 4);
 
