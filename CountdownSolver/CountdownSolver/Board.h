@@ -2,6 +2,7 @@
 #define BOARD_H
 
 #include <vector>
+#include <iostream>
 
 const unsigned int G_CHOSEN_NUMBERS_SIZE = 6;
 const unsigned int G_BIG_NUMBERS_SIZE = 4;
@@ -25,10 +26,24 @@ const unsigned int G_MIN_TARGET = 101;
 
 struct IntermediateStep
 {
-	IntermediateStep(int number, std::vector<int> vect) : numberSoFar(number), numbersRemaining(vect) {}
+	IntermediateStep(std::vector<int> nRemaining, std::vector<int> nReached)
+		: targetReached(false), numbersRemaining(nRemaining), numbersReached(nReached) {}
 
-	int numberSoFar;
+	bool targetReached;
 	std::vector<int> numbersRemaining = std::vector<int>();
+	std::vector<int> numbersReached = std::vector<int>();
+};
+
+struct InfoAboutNumbersReached
+{
+	InfoAboutNumbersReached(bool tReached, std::vector<int> nReached)
+		: targetReached(tReached), numbersReached(nReached) {}
+
+	InfoAboutNumbersReached()
+		: targetReached(false), numbersReached(std::vector<int> {0}) {};
+
+	bool targetReached;
+	std::vector<int> numbersReached;
 };
 
 class Board
@@ -36,30 +51,28 @@ class Board
 private :
 
 	std::vector<int> m_chosenNumbers;
-	unsigned int m_target = G_BASE_TARGET;
 	std::vector<int> m_availableBigNumbers;
 	std::vector<int> m_availableSmallNumbers;
 
-	bool m_readyForSolve = false;
-
-	// Disable copy constructor
-	Board(const Board&);
-
 public :
+
+	unsigned int m_target = G_BASE_TARGET;
 
 	// CONSTRUCTORS
 	Board();
+	Board(Board const&);
 
 	// GETTERS
 
 	// METHODS
-	bool RecursiveSolve();
-	bool RecursiveSolve(IntermediateStep const&);
+	bool RecursiveSolve() const;
+	InfoAboutNumbersReached RecursiveSolve(IntermediateStep const&) const;
 	void ResetBoard();
 	void SetUpNumbersAndTarget(unsigned int, unsigned int);
 
 	// OPERATOR OVERLOADS
-	void operator= (const Board&);
+	void operator= (Board const&);
+	friend std::ostream& operator<<(std::ostream&, const Board&);
 };
 
 #endif

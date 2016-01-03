@@ -1,11 +1,16 @@
 #include "Board.h"
-#include <iostream>
+#include "CommonTemplateFunctions.h"
 #include <random>
+#include <new>
+
+#define DEBUG
 
 // CONSTRUCTORS
 
 Board::Board()
 {
+	m_target = G_BASE_TARGET;
+
 	// Populate m_availableBigNumbers with one of each big number
 
 	for (int l_index = 0; l_index < G_BIG_NUMBERS_SIZE; l_index++)
@@ -21,18 +26,41 @@ Board::Board()
 	}
 }
 
-Board::Board(const Board&)
+Board::Board(Board const& board)
 {
-	// Disabled
+	m_target = board.m_target;
+	m_chosenNumbers = board.m_chosenNumbers;
+	m_availableBigNumbers = board.m_availableBigNumbers;
+	m_availableSmallNumbers = board.m_availableSmallNumbers;
 }
 
 // GETTERS
 
 // METHODS
 
-bool Board::RecursiveSolve()
+bool Board::RecursiveSolve() const
 {
-	if (RecursiveSolve({ 0, m_chosenNumbers }))
+	IntermediateStep t_workingOut = { m_chosenNumbers, std::vector<int> {0} };
+
+	std::cout << *this;
+
+	InfoAboutNumbersReached t_endResult = RecursiveSolve(t_workingOut);
+
+	// Check if any of them are equal to the target
+
+	std::cout << *this;
+
+	for (unsigned int numbersReachedIndex = 0; numbersReachedIndex < t_endResult.numbersReached.size(); numbersReachedIndex++)
+	{
+		if (t_endResult.numbersReached[numbersReachedIndex] == m_target)
+		{
+			t_endResult.targetReached = true;
+		}
+
+		break;
+	}
+
+	if (t_endResult.targetReached)
 	{
 		return true;
 	}
@@ -43,97 +71,165 @@ bool Board::RecursiveSolve()
 	}
 }
 
-bool Board::RecursiveSolve(IntermediateStep const& s_nextStep)
+InfoAboutNumbersReached Board::RecursiveSolve(IntermediateStep const& s_nextStep) const
 {
-	// Checks if the target is reachable given the chosen numbers, returns true if yes and false if not
+	InfoAboutNumbersReached t_newNumbers{ false, std::vector<int> {0} };
 
-	if (!m_readyForSolve)
+	// Check if the target has already been achieved
+
+	if (s_nextStep.targetReached)
 	{
-		SetUpNumbersAndTarget(0, 6); // In case somebody calls RecursiveSolve before SetUp...
+		t_newNumbers = { true, s_nextStep.numbersReached };
 	}
 
-	// Check if the achieved number is the target number
+	// Base case: if there is one number left, add all possibilities using that number to the list of numbers reached
+	// Also return information about whether the target was reached
 
-	if (s_nextStep.numberSoFar == m_target)
+	else if (!s_nextStep.targetReached && s_nextStep.numbersRemaining.size() == 1)
 	{
-		return true;
-	}
-
-	else if (s_nextStep.numberSoFar != m_target && s_nextStep.numbersRemaining.size() == 0)
-	{
-		return false;
-	}
-
-	else
-	{
-		for (unsigned int l_chosenNumberIndex = 0; l_chosenNumberIndex < s_nextStep.numbersRemaining.size(); l_chosenNumberIndex++)
+		// Try all relevant additions, subtractions, multiplications and divisions for each number in numbersReached
+		for (unsigned int l_reachableNumber = 0; l_reachableNumber < s_nextStep.numbersReached.size(); l_reachableNumber++)
 		{
-			std::vector<int> t_unusedNumbersSoFar = std::vector<int>();
+			t_newNumbers.numbersReached.push_back(s_nextStep.numbersReached[l_reachableNumber] + s_nextStep.numbersRemaining[0]);
 
-			for (unsigned int l_secondChosenNumberIndex = 0; l_secondChosenNumberIndex < s_nextStep.numbersRemaining.size();
-				l_secondChosenNumberIndex++)
+			s_nextStep.numbersReached[l_reachableNumber] >= s_nextStep.numbersRemaining[0] ?
+				t_newNumbers.numbersReached.push_back(s_nextStep.numbersReached[l_reachableNumber] - s_nextStep.numbersRemaining[0])
+				: t_newNumbers.numbersReached.push_back(s_nextStep.numbersRemaining[0] - s_nextStep.numbersReached[l_reachableNumber]);
+
+			t_newNumbers.numbersReached.push_back(s_nextStep.numbersReached[l_reachableNumber] * s_nextStep.numbersRemaining[0]);
+
+			if (t_newNumbers.numbersReached[l_reachableNumber] % s_nextStep.numbersRemaining[0] == 0)
 			{
-				if (l_secondChosenNumberIndex != l_chosenNumberIndex)
+				t_newNumbers.numbersReached.push_back(s_nextStep.numbersReached[l_reachableNumber] / s_nextStep.numbersRemaining[0]);
+			}
+
+			if (s_nextStep.numbersReached[l_reachableNumber] != 0
+				&& s_nextStep.numbersRemaining[0] % s_nextStep.numbersReached[l_reachableNumber] == 0)
+			{
+				t_newNumbers.numbersReached.push_back(s_nextStep.numbersRemaining[0] / s_nextStep.numbersReached[l_reachableNumber]);
+			}
+		}
+
+		// Check if any of the new numbers are equal to the target
+		for (std::vector<int>::iterator l_newNumbersReached = t_newNumbers.numbersReached.begin();
+			l_newNumbersReached != t_newNumbers.numbersReached.end(); l_newNumbersReached++)
+		{
+			if (*l_newNumbersReached == m_target)
+			{
+				t_newNumbers.targetReached = true;
+			}
+		}
+	}
+
+	// Otherwise, let n = s_nextStep.numbersRemaining.size(), let x be in the interval [1, n/2], let S be a subset of x elements
+	// from s_nextStep.numbersRemaining and let T be s_nextStep.numbersRemaining \ S. Let ~ be an operation (+, -, *, /). Let c range
+	// through the elements of s_nextStep.numbersReached. Let a, a' be integers from RecursiveSolve(S, {0}) and RecursiveSolve(S, {c})
+	// respectively. Let b, b' be integers from RecursiveSolve(T, {0}) and RecursiveSolve(T, {c}) respectively.
+
+	// Return all elements of the form a ~ b' and a' ~ b, wherever these elements are integers, together with a boolean determining
+	// whether any of these elements are equal to the target.
+
+	// BUG?: If the below statement is just "else" it doesn't trigger when s_nextStep.numbersRemaining.size() > 1
+
+	else if (s_nextStep.numbersRemaining.size() > 1)
+	{
+		// For each possible size l_subsetSize of subset...
+		for (unsigned int l_subsetSize = 1; l_subsetSize <= s_nextStep.numbersRemaining.size() / 2; l_subsetSize++)
+		{
+			// Generate all subsets of that size...
+
+			std::vector<std::vector<int>> t_allSubsetsOfThatSize = GenerateSubsets(s_nextStep.numbersRemaining, l_subsetSize);
+
+			// For each subset *l_nextSubsetIndex of that size...
+
+			for (std::vector<std::vector<int>>::iterator l_nextSubsetIndex = t_allSubsetsOfThatSize.begin();
+				l_nextSubsetIndex != t_allSubsetsOfThatSize.end();
+				l_nextSubsetIndex++)
+			{
+				// Determine set complement t_subsetComplement of *l_nextSubsetIndex in s_nextStep.numbersRemaining...
+
+				std::vector<int> t_subsetComplement = SetComplement(s_nextStep.numbersRemaining, *l_nextSubsetIndex);
+
+				// For each element *l_nextNumberReached of s_nextStep.numbersReached...
+
+				for (std::vector<int>::const_iterator l_nextNumberReached = s_nextStep.numbersReached.begin();
+					l_nextNumberReached != s_nextStep.numbersReached.end();
+					l_nextNumberReached++)
 				{
-					t_unusedNumbersSoFar.push_back(s_nextStep.numbersRemaining[l_secondChosenNumberIndex]);
-				}
-			}
+					// Get RecursiveSolve(S, {0})
 
-			// Solve again after adding the next candidate number
+					InfoAboutNumbersReached t_reachableFromZero = RecursiveSolve({ *l_nextSubsetIndex, std::vector<int> {0} });
 
-			if (RecursiveSolve({ s_nextStep.numberSoFar + s_nextStep.numbersRemaining[l_chosenNumberIndex], t_unusedNumbersSoFar }))
-			{
-				return true;
-			}
+					// For each element *l_nextReturnedNumberReached of t_reachableFromZero.numbersReached...
 
-			// Solve again after subtracting the next candidate number, or by subtracting the number so far from the candidate number
-
-			if (RecursiveSolve({ s_nextStep.numberSoFar - s_nextStep.numbersRemaining[l_chosenNumberIndex], t_unusedNumbersSoFar }))
-			{
-				return true;
-			}
-
-			if (RecursiveSolve({ s_nextStep.numbersRemaining[l_chosenNumberIndex] - s_nextStep.numberSoFar, t_unusedNumbersSoFar }))
-			{
-				return true;
-			}
-
-			// Solve again after multiplying by the candidate number
-
-			if (RecursiveSolve({ s_nextStep.numberSoFar * s_nextStep.numbersRemaining[l_chosenNumberIndex], t_unusedNumbersSoFar }))
-			{
-				return true;
-			}
-
-			// Solve again after dividing by the candidate number, or by dividing the number so far by the candidate number
-
-			if (s_nextStep.numberSoFar != 0)
-			{
-				if (s_nextStep.numbersRemaining[l_chosenNumberIndex] % s_nextStep.numberSoFar == 0)
-				{
-					if (RecursiveSolve({ s_nextStep.numberSoFar / s_nextStep.numbersRemaining[l_chosenNumberIndex], t_unusedNumbersSoFar }))
+					for (std::vector<int>::iterator l_nextReturnedNumberReached = t_reachableFromZero.numbersReached.begin();
+						l_nextReturnedNumberReached != t_reachableFromZero.numbersReached.end();
+						l_nextReturnedNumberReached++)
 					{
-						return true;
-					}
-				}
-			}
+						// Get RecursiveSolve(T, {c})
 
-			if (s_nextStep.numberSoFar != 0)
-			{
-				if (s_nextStep.numberSoFar % s_nextStep.numbersRemaining[l_chosenNumberIndex] == 0)
-				{
-					if (RecursiveSolve({ s_nextStep.numbersRemaining[l_chosenNumberIndex] / s_nextStep.numberSoFar, t_unusedNumbersSoFar }))
-					{
-						return true;
+						InfoAboutNumbersReached t_reachableWithSetComplementFromNumberReached
+							= RecursiveSolve({ t_subsetComplement, std::vector<int> {*l_nextNumberReached} });
+
+						// For each element *l_nextSetComplementReturnedNumberReached of t_reachableWithSetComplementFromNumberReached...
+
+						for (std::vector<int>::iterator l_nextSetComplementReturnedNumberReached = t_reachableWithSetComplementFromNumberReached.numbersReached.begin();
+							l_nextSetComplementReturnedNumberReached != t_reachableWithSetComplementFromNumberReached.numbersReached.end();
+							l_nextSetComplementReturnedNumberReached++)
+						{
+							// Do all possible operations on these numbers and add them to t_newNumbers.numbersReached
+
+							try
+							{
+								UnsortedAddIfDistinct(*l_nextReturnedNumberReached + *l_nextSetComplementReturnedNumberReached,
+									t_newNumbers.numbersReached);
+
+								*l_nextReturnedNumberReached >= *l_nextSetComplementReturnedNumberReached ?
+									UnsortedAddIfDistinct(*l_nextReturnedNumberReached - *l_nextSetComplementReturnedNumberReached,
+									t_newNumbers.numbersReached)
+									: UnsortedAddIfDistinct(*l_nextSetComplementReturnedNumberReached - *l_nextReturnedNumberReached,
+									t_newNumbers.numbersReached);
+
+								UnsortedAddIfDistinct(*l_nextReturnedNumberReached * *l_nextSetComplementReturnedNumberReached,
+									t_newNumbers.numbersReached);
+
+								if (*l_nextSetComplementReturnedNumberReached != 0
+									&& *l_nextReturnedNumberReached % *l_nextSetComplementReturnedNumberReached == 0)
+								{
+									UnsortedAddIfDistinct(*l_nextReturnedNumberReached / *l_nextSetComplementReturnedNumberReached,
+										t_newNumbers.numbersReached);
+								}
+
+								if (*l_nextReturnedNumberReached != 0
+									&& *l_nextSetComplementReturnedNumberReached % *l_nextReturnedNumberReached == 0)
+								{
+									UnsortedAddIfDistinct(*l_nextSetComplementReturnedNumberReached / *l_nextReturnedNumberReached,
+										t_newNumbers.numbersReached);
+								}
+							}
+							catch (std::exception& error)
+							{
+								std::cerr << error.what() << "\n";
+							}
+
+							// Could also do nothing and return *l_nextNumberReached!
+
+							UnsortedAddIfDistinct(*l_nextNumberReached, t_newNumbers.numbersReached);
+						}
 					}
 				}
 			}
 		}
-
-		// If no successful method is found, conclude this branch cannot be solved
-
-		return false;
 	}
+
+	#ifdef DEBUG
+	if (s_nextStep.numbersRemaining.size() >= G_CHOSEN_NUMBERS_SIZE - 1)
+	{
+		std::cout << "RecursiveSolve() returning for size " << s_nextStep.numbersRemaining.size() << ".\n";
+	}
+	#endif
+
+	return t_newNumbers;
 }
 
 void Board::ResetBoard()
@@ -230,13 +326,29 @@ void Board::SetUpNumbersAndTarget(unsigned int bigNumbers, unsigned int smallNum
 
 		m_target = (rand() % (G_MAX_TARGET - G_MIN_TARGET)) + G_MIN_TARGET;
 	}
-
-	m_readyForSolve = true;
 }
 
 // OPERATOR OVERLOADS
 
-void Board::operator= (const Board& a_board)
+void Board::operator= (Board const& board)
 {
-	
+	m_target = board.m_target;
+	m_chosenNumbers = board.m_chosenNumbers;
+	m_availableBigNumbers = board.m_availableBigNumbers;
+	m_availableSmallNumbers = board.m_availableSmallNumbers;
+}
+
+std::ostream& operator<< (std::ostream& os, const Board& board)
+{
+	os << "Target is: " << board.m_target << "\n";
+	os << "Numbers are: ";
+
+	for (int nextNumber = 0; nextNumber < G_CHOSEN_NUMBERS_SIZE; nextNumber++)
+	{
+		os << board.m_chosenNumbers[nextNumber] << " ";
+	}
+
+	os << "\n";
+
+	return os;
 }
