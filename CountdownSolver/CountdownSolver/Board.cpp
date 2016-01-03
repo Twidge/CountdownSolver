@@ -11,6 +11,8 @@ Board::Board()
 {
 	m_target = G_BASE_TARGET;
 
+	m_chosenNumbers = std::vector<int>();
+
 	// Populate m_availableBigNumbers with one of each big number
 
 	for (int l_index = 0; l_index < G_BIG_NUMBERS_SIZE; l_index++)
