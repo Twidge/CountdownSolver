@@ -3,8 +3,6 @@
 #include <random>
 #include <new>
 
-#define DEBUG
-
 // CONSTRUCTORS
 
 Board::Board()
@@ -157,17 +155,25 @@ InfoAboutNumbersReached Board::RecursiveSolve(IntermediateStep const& s_nextStep
 
 					InfoAboutNumbersReached t_reachableFromZero = RecursiveSolve({ *l_nextSubsetIndex, std::vector<int> {0} });
 
+					// Get RecursiveSolve(T, {c})
+
+					InfoAboutNumbersReached t_reachableWithSetComplementFromNumberReached
+						= RecursiveSolve({ t_subsetComplement, std::vector<int> {*l_nextNumberReached} });
+
+					// If target is reachable in one of the below, just skip to the end
+
+					if (t_reachableFromZero.targetReached || t_reachableWithSetComplementFromNumberReached.targetReached)
+					{
+						t_newNumbers.targetReached = true;
+						break;
+					}
+
 					// For each element *l_nextReturnedNumberReached of t_reachableFromZero.numbersReached...
 
 					for (std::vector<int>::iterator l_nextReturnedNumberReached = t_reachableFromZero.numbersReached.begin();
 						l_nextReturnedNumberReached != t_reachableFromZero.numbersReached.end();
 						l_nextReturnedNumberReached++)
 					{
-						// Get RecursiveSolve(T, {c})
-
-						InfoAboutNumbersReached t_reachableWithSetComplementFromNumberReached
-							= RecursiveSolve({ t_subsetComplement, std::vector<int> {*l_nextNumberReached} });
-
 						// For each element *l_nextSetComplementReturnedNumberReached of t_reachableWithSetComplementFromNumberReached...
 
 						for (std::vector<int>::iterator l_nextSetComplementReturnedNumberReached = t_reachableWithSetComplementFromNumberReached.numbersReached.begin();
@@ -178,30 +184,51 @@ InfoAboutNumbersReached Board::RecursiveSolve(IntermediateStep const& s_nextStep
 
 							try
 							{
-								UnsortedAddIfDistinct(*l_nextReturnedNumberReached + *l_nextSetComplementReturnedNumberReached,
-									t_newNumbers.numbersReached);
+								if (s_nextStep.numbersRemaining.size() != 6
+									|| *l_nextReturnedNumberReached + *l_nextSetComplementReturnedNumberReached == m_target)
+								{
+									UnsortedAddIfDistinct(*l_nextReturnedNumberReached + *l_nextSetComplementReturnedNumberReached,
+										t_newNumbers.numbersReached);
+								}
 
-								*l_nextReturnedNumberReached >= *l_nextSetComplementReturnedNumberReached ?
-									UnsortedAddIfDistinct(*l_nextReturnedNumberReached - *l_nextSetComplementReturnedNumberReached,
-									t_newNumbers.numbersReached)
-									: UnsortedAddIfDistinct(*l_nextSetComplementReturnedNumberReached - *l_nextReturnedNumberReached,
-									t_newNumbers.numbersReached);
+								if (s_nextStep.numbersRemaining.size() != 6
+									|| *l_nextReturnedNumberReached - *l_nextSetComplementReturnedNumberReached == m_target
+									|| *l_nextSetComplementReturnedNumberReached - *l_nextReturnedNumberReached == m_target)
+								{
+									*l_nextReturnedNumberReached >= *l_nextSetComplementReturnedNumberReached ?
+										UnsortedAddIfDistinct(*l_nextReturnedNumberReached - *l_nextSetComplementReturnedNumberReached,
+										t_newNumbers.numbersReached)
+										: UnsortedAddIfDistinct(*l_nextSetComplementReturnedNumberReached - *l_nextReturnedNumberReached,
+										t_newNumbers.numbersReached);
+								}
 
-								UnsortedAddIfDistinct(*l_nextReturnedNumberReached * *l_nextSetComplementReturnedNumberReached,
-									t_newNumbers.numbersReached);
+								if (s_nextStep.numbersRemaining.size() != 6
+									|| *l_nextReturnedNumberReached * *l_nextSetComplementReturnedNumberReached == m_target)
+								{
+									UnsortedAddIfDistinct(*l_nextReturnedNumberReached * *l_nextSetComplementReturnedNumberReached,
+										t_newNumbers.numbersReached);
+								}
 
 								if (*l_nextSetComplementReturnedNumberReached != 0
 									&& *l_nextReturnedNumberReached % *l_nextSetComplementReturnedNumberReached == 0)
 								{
-									UnsortedAddIfDistinct(*l_nextReturnedNumberReached / *l_nextSetComplementReturnedNumberReached,
-										t_newNumbers.numbersReached);
+									if (s_nextStep.numbersRemaining.size() != 6
+										|| *l_nextReturnedNumberReached / *l_nextSetComplementReturnedNumberReached == m_target)
+									{
+										UnsortedAddIfDistinct(*l_nextReturnedNumberReached / *l_nextSetComplementReturnedNumberReached,
+											t_newNumbers.numbersReached);
+									}
 								}
 
 								if (*l_nextReturnedNumberReached != 0
 									&& *l_nextSetComplementReturnedNumberReached % *l_nextReturnedNumberReached == 0)
 								{
-									UnsortedAddIfDistinct(*l_nextSetComplementReturnedNumberReached / *l_nextReturnedNumberReached,
-										t_newNumbers.numbersReached);
+									if (s_nextStep.numbersRemaining.size() != 6
+										|| *l_nextSetComplementReturnedNumberReached / *l_nextReturnedNumberReached == m_target)
+									{
+										UnsortedAddIfDistinct(*l_nextSetComplementReturnedNumberReached / *l_nextReturnedNumberReached,
+											t_newNumbers.numbersReached);
+									}
 								}
 							}
 							catch (std::exception& error)
@@ -215,6 +242,16 @@ InfoAboutNumbersReached Board::RecursiveSolve(IntermediateStep const& s_nextStep
 						}
 					}
 				}
+
+				if(t_newNumbers.targetReached)
+				{
+					break;
+				}
+			}
+
+			if (t_newNumbers.targetReached)
+			{
+				break;
 			}
 		}
 	}
@@ -234,6 +271,7 @@ void Board::ResetBoard()
 	// Resets the board to the state it was in when created
 
 	m_target = G_BASE_TARGET;
+	m_chosenNumbers.clear();
 
 	// Repopulate m_availableBigNumbers and m_availableSmallNumbers
 	// {OPT}: Faster way of doing this?

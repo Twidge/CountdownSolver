@@ -6,27 +6,29 @@
 #include <iostream>
 #include <ctime>
 
+const unsigned int G_NUMBER_OF_TRIALS = 100;
+
 int _tmain(int argc, _TCHAR* argv[])
 {
 	srand(static_cast<unsigned int>(time(NULL)));
 
 	Board gameBoard;
 
-	gameBoard.SetUpNumbersAndTarget(2, 4);
+	unsigned int t_successCounter = 0;
 
-	std::cout << gameBoard;
-
-	bool t_canBeSolved = gameBoard.RecursiveSolve();
-
-	if (t_canBeSolved)
+	for (unsigned int l_trialNumber = 0; l_trialNumber < G_NUMBER_OF_TRIALS; l_trialNumber++)
 	{
-		std::cout << "Board can be solved.\n";
+		gameBoard.SetUpNumbersAndTarget(2, 4);
+
+		if (gameBoard.RecursiveSolve())
+		{
+			t_successCounter++;
+		}
+
+		std::cout << "Trial " << l_trialNumber + 1 << " complete.\n";
 	}
 
-	else
-	{
-		std::cout << "Board cannot be solved.\n";
-	}
+	std::cout << t_successCounter << " of " << G_NUMBER_OF_TRIALS << " trials were successful.\n";
 
 	std::cin.get();
 
